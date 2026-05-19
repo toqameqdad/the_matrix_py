@@ -1,9 +1,12 @@
 import os
 import sys
-from typing import Optional
 
 from dotenv import load_dotenv
 
+
+SCRIPT_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
+ENV_FILE = os.path.join(SCRIPT_DIRECTORY, ".env")
+GITIGNORE_FILE = os.path.join(SCRIPT_DIRECTORY, ".gitignore")
 
 REQUIRED_CONFIGS: list[str] = [
     "MATRIX_MODE",
@@ -15,14 +18,14 @@ REQUIRED_CONFIGS: list[str] = [
 
 
 def load_configuration() -> None:
-    load_dotenv()
+    load_dotenv(ENV_FILE)
 
 
-def get_config_value(name: str) -> Optional[str]:
+def get_config_value(name: str) -> str | None:
     return os.getenv(name)
 
 
-def mask_secret(secret: Optional[str]) -> str:
+def mask_secret(secret: str | None) -> str:
     if not secret:
         return "Missing"
 
@@ -45,6 +48,24 @@ def validate_configuration() -> bool:
     return valid
 
 
+def describe_mode(mode: str) -> None:
+    if mode == "production":
+        print("Runtime profile: production overrides active")
+    elif mode == "development":
+        print("Runtime profile: development settings active")
+    else:
+        print("Runtime profile: custom mode detected")
+
+
+def show_database_status(database_url: str | None) -> None:
+    if not database_url:
+        print("Database: Missing")
+    elif "localhost" in database_url or "127.0.0.1" in database_url:
+        print("Database: Connected to local instance")
+    else:
+        print("Database: External connection configured")
+
+
 def show_configuration() -> None:
     mode = get_config_value("MATRIX_MODE") or "development"
     database_url = get_config_value("DATABASE_URL")
@@ -52,16 +73,11 @@ def show_configuration() -> None:
     log_level = get_config_value("LOG_LEVEL") or "INFO"
     zion_endpoint = get_config_value("ZION_ENDPOINT")
 
+    print()
     print("Configuration loaded:")
     print(f"Mode: {mode}")
-
-    if database_url:
-        if "localhost" in database_url or "127.0.0.1" in database_url:
-            print("Database: Connected to local instance")
-        else:
-            print("Database: External connection configured")
-    else:
-        print("Database: Missing")
+    describe_mode(mode)
+    show_database_status(database_url)
 
     if api_key:
         print(f"API Access: Authenticated ({mask_secret(api_key)})")
@@ -76,31 +92,40 @@ def show_configuration() -> None:
         print("Zion Network: Offline")
 
 
+def env_file_is_ignored() -> bool:
+    if not os.path.exists(GITIGNORE_FILE):
+        return False
+
+    with open(GITIGNORE_FILE, "r", encoding="utf-8") as file:
+        lines = file.readlines()
+
+    for line in lines:
+        if line.strip() == ".env":
+            return True
+
+    return False
+
+
 def security_check() -> None:
     print()
     print("Environment security check:")
 
-    if os.path.exists(".env"):
+    if os.path.exists(ENV_FILE):
         print("[OK] .env file found for local configuration")
     else:
         print("[WARNING] .env file not found")
 
-    if os.path.exists(".gitignore"):
-        with open(".gitignore", "r", encoding="utf-8") as file:
-            content = file.read()
-
-        if ".env" in content:
-            print("[OK] .env file properly ignored")
-        else:
-            print("[WARNING] .env should be added to .gitignore")
+    if env_file_is_ignored():
+        print("[OK] .env file properly ignored")
     else:
-        print("[WARNING] .gitignore file not found")
+        print("[WARNING] .env should be added to .gitignore")
 
     print("[OK] No hardcoded secrets detected")
     print("[OK] Production overrides available")
 
 
 def main() -> None:
+    print("Accessing the Mainframe")
     print("ORACLE STATUS: Reading the Matrix...")
 
     try:
@@ -112,7 +137,7 @@ def main() -> None:
         if not configuration_valid:
             print()
             print("Some configuration values are missing.")
-            print("Copy .env.example to .env and fill the values.")
+            print("Copy ex2/.env.example to ex2/.env and fill the values.")
             sys.exit(1)
 
         print()
