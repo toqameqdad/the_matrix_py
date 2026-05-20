@@ -1,14 +1,15 @@
 [tool.poetry]
 name = "matrix-loading"
-version = "0.1.0"
+version = "1.0.0"
 description = "Matrix data analysis exercise"
-authors = ["Your Name <you@example.com>"]
+authors = ["Your Name <toqa@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-pandas = "*"
-numpy = "*"
-matplotlib = "*"
+pandas = "2.2.3"
+numpy = "2.2.0"
+matplotlib = "3.10.8"
+requests = "2.31.0"
 
 [build-system]
 requires = ["poetry-core"]

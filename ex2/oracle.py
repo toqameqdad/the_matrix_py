@@ -1,7 +1,12 @@
 import os
 import sys
 
-from dotenv import load_dotenv
+
+try:
+    from dotenv import load_dotenv
+    DOTENV_AVAILABLE = True
+except ImportError:
+    DOTENV_AVAILABLE = False
 
 
 SCRIPT_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
@@ -17,22 +22,20 @@ REQUIRED_CONFIGS: list[str] = [
 ]
 
 
-def load_configuration() -> None:
+def load_configuration() -> bool:
+    if not DOTENV_AVAILABLE:
+        print("ORACLE STATUS: Reading the Matrix...")
+        print("[ERROR] python-dotenv is not installed.")
+        print("Install it using:")
+        print("pip install python-dotenv")
+        return False
+
     load_dotenv(ENV_FILE)
+    return True
 
 
 def get_config_value(name: str) -> str | None:
     return os.getenv(name)
-
-
-def mask_secret(secret: str | None) -> str:
-    if not secret:
-        return "Missing"
-
-    if len(secret) <= 4:
-        return "****"
-
-    return f"{secret[:2]}****{secret[-2:]}"
 
 
 def validate_configuration() -> bool:
@@ -42,28 +45,22 @@ def validate_configuration() -> bool:
         value = get_config_value(config_name)
 
         if not value:
-            print(f"[WARNING] Missing configuration: {config_name}")
             valid = False
 
     return valid
 
 
-def describe_mode(mode: str) -> None:
-    if mode == "production":
-        print("Runtime profile: production overrides active")
-    elif mode == "development":
-        print("Runtime profile: development settings active")
-    else:
-        print("Runtime profile: custom mode detected")
-
-
-def show_database_status(database_url: str | None) -> None:
+def show_database_status(database_url: str | None) -> str:
     if not database_url:
-        print("Database: Missing")
-    elif "localhost" in database_url or "127.0.0.1" in database_url:
-        print("Database: Connected to local instance")
-    else:
-        print("Database: External connection configured")
+        return "Missing"
+
+    if (
+        "localhost" in database_url
+        or "127.0.0.1" in database_url
+    ):
+        return "Connected to local instance"
+
+    return "External connection configured"
 
 
 def show_configuration() -> None:
@@ -73,14 +70,15 @@ def show_configuration() -> None:
     log_level = get_config_value("LOG_LEVEL") or "INFO"
     zion_endpoint = get_config_value("ZION_ENDPOINT")
 
-    print()
-    print("Configuration loaded:")
+    print("\nConfiguration loaded:")
     print(f"Mode: {mode}")
-    describe_mode(mode)
-    show_database_status(database_url)
+    print(
+        f"Database: "
+        f"{show_database_status(database_url)}"
+    )
 
     if api_key:
-        print(f"API Access: Authenticated ({mask_secret(api_key)})")
+        print("API Access: Authenticated")
     else:
         print("API Access: Missing")
 
@@ -96,7 +94,11 @@ def env_file_is_ignored() -> bool:
     if not os.path.exists(GITIGNORE_FILE):
         return False
 
-    with open(GITIGNORE_FILE, "r", encoding="utf-8") as file:
+    with open(
+        GITIGNORE_FILE,
+        "r",
+        encoding="utf-8",
+    ) as file:
         lines = file.readlines()
 
     for line in lines:
@@ -107,45 +109,36 @@ def env_file_is_ignored() -> bool:
 
 
 def security_check() -> None:
-    print()
-    print("Environment security check:")
-
-    if os.path.exists(ENV_FILE):
-        print("[OK] .env file found for local configuration")
-    else:
-        print("[WARNING] .env file not found")
+    print("\nEnvironment security check:")
+    print("[OK] No hardcoded secrets detected")
 
     if env_file_is_ignored():
-        print("[OK] .env file properly ignored")
+        print("[OK] .env file properly configured")
     else:
-        print("[WARNING] .env should be added to .gitignore")
+        print(
+            "[WARNING] .env should be added "
+            "to .gitignore"
+        )
 
-    print("[OK] No hardcoded secrets detected")
     print("[OK] Production overrides available")
 
 
 def main() -> None:
-    print("Accessing the Mainframe")
+    if not load_configuration():
+        sys.exit(1)
+
     print("ORACLE STATUS: Reading the Matrix...")
 
-    try:
-        load_configuration()
-        configuration_valid = validate_configuration()
-        show_configuration()
-        security_check()
+    configuration_valid = validate_configuration()
 
-        if not configuration_valid:
-            print()
-            print("Some configuration values are missing.")
-            print("Copy ex2/.env.example to ex2/.env and fill the values.")
-            sys.exit(1)
+    show_configuration()
+    security_check()
 
+    if not configuration_valid:
         print()
-        print("The Oracle sees all configurations.")
+        print("WARNING: Missing configuration values.")
 
-    except OSError as error:
-        print(f"Configuration error: {error}")
-        sys.exit(1)
+    print("\nThe Oracle sees all configurations.")
 
 
 if __name__ == "__main__":
